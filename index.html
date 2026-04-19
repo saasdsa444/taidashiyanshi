@@ -106,14 +106,14 @@
       // 显示加载中
       results.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">搜索中...</p>';
 
-      // 尝试使用DeepSeek API进行智能查询
-      useDeepSeekQuery(keyword)
-        .then(deepseekResult => {
-          if (deepseekResult) {
-            // 如果DeepSeek API返回结果，显示智能查询结果
+      // 尝试使用OpenAI兼容API进行智能查询
+      useOpenAIQuery(keyword)
+        .then(openaiResult => {
+          if (openaiResult) {
+            // 如果OpenAI兼容API返回结果，显示智能查询结果
             results.innerHTML = `<div class="result-item" style="background-color: #f0f8f0;">
               <h3>智能查询结果</h3>
-              <p style="white-space: pre-wrap;">${deepseekResult}</p>
+              <p style="white-space: pre-wrap;">${openaiResult}</p>
             </div>`;
           } else {
             // 传统搜索
@@ -183,8 +183,9 @@
     const BAIDU_SECRET_KEY = 'your_secret_key';
     let accessToken = '';
     
-    // DeepSeek API配置（免费）
-    const DEEPSEEK_API_KEY = 'sk-901e501f8e9f43ca861f17029a3f7780'; // 已配置API密钥
+    // OpenAI兼容API配置
+    const OPENAI_API_KEY = 'sk-GosAG4DIJx8JLFoIckdwdeE9OvfWq72jyiOvTeqQWWEsUDqa'; // 已配置API密钥
+    const OPENAI_API_BASE = 'https://tb.api.mkeai.com'; // 新的OpenAI兼容端点
 
     // 获取百度语音识别API的访问令牌
     function getBaiduAccessToken() {
@@ -286,16 +287,20 @@
       });
     }
 
-    // 使用DeepSeek API进行智能查询
-    function useDeepSeekQuery(query) {
+    // 使用OpenAI兼容API进行智能查询
+    function useOpenAIQuery(query) {
       return new Promise((resolve, reject) => {
-        if (!DEEPSEEK_API_KEY || DEEPSEEK_API_KEY === 'your_deepseek_api_key') {
+        if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key') {
           // 如果没有配置API密钥，使用传统搜索
+          console.log('OpenAI API密钥未配置，使用传统搜索');
           resolve(null);
           return;
         }
 
-        const url = 'https://api.deepseek.com/v1/chat/completions';
+        console.log('调用OpenAI兼容API查询:', query);
+        console.log('实验数据数量:', experiments.length);
+
+        const url = `${OPENAI_API_BASE}/chat/completions`;
         const messages = [
           {
             role: 'system',
@@ -311,7 +316,7 @@
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+            'Authorization': `Bearer ${OPENAI_API_KEY}`
           },
           body: JSON.stringify({
             model: 'deepseek-chat',
@@ -320,16 +325,21 @@
             max_tokens: 500
           })
         })
-        .then(response => response.json())
+        .then(response => {
+          console.log('OpenAI兼容API响应状态:', response.status);
+          return response.json();
+        })
         .then(data => {
+          console.log('OpenAI兼容API响应数据:', data);
           if (data.choices && data.choices.length > 0) {
             resolve(data.choices[0].message.content);
           } else {
+            console.log('OpenAI兼容API无结果');
             resolve(null);
           }
         })
         .catch(error => {
-          console.error('DeepSeek API调用失败:', error);
+          console.error('OpenAI兼容API调用失败:', error);
           resolve(null);
         });
       });
