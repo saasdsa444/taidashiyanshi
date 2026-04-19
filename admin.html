@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>实验室管理后台</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #333;
+      text-align: center;
+    }
+    .section {
+      margin: 30px 0;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+    }
+    h2 {
+      color: #555;
+    }
+    form {
+      margin: 20px 0;
+    }
+    input[type="file"] {
+      margin: 10px 0;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    .result {
+      margin: 10px 0;
+      padding: 10px;
+      background-color: #f0f0f0;
+      border-radius: 5px;
+    }
+    .experiment-list {
+      margin: 20px 0;
+    }
+    .experiment-item {
+      padding: 15px;
+      border-bottom: 1px solid #ddd;
+      margin-bottom: 10px;
+    }
+    .experiment-item:hover {
+      background-color: #f9f9f9;
+    }
+    .experiment-item h3 {
+      margin: 0 0 5px 0;
+    }
+    .experiment-item p {
+      margin: 5px 0;
+    }
+    .action-buttons {
+      margin-top: 10px;
+    }
+    .action-buttons button {
+      margin-right: 10px;
+      padding: 5px 10px;
+      font-size: 12px;
+    }
+    .edit-form {
+      margin-top: 10px;
+      padding: 10px;
+      background-color: #f5f5f5;
+      border-radius: 5px;
+    }
+    .edit-form input, .edit-form textarea {
+      width: 100%;
+      padding: 5px;
+      margin: 5px 0;
+      box-sizing: border-box;
+    }
+    .back-link {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      padding: 10px 15px;
+      background-color: #f0f0f0;
+      border-radius: 5px;
+      text-decoration: none;
+      color: #333;
+      font-size: 14px;
+    }
+    .back-link:hover {
+      background-color: #e0e0e0;
+    }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">返回查询页面</a>
+  <div class="container">
+    <h1>实验室管理后台</h1>
+    
+    <!-- 上传Excel文件 -->
+    <div class="section">
+      <h2>上传实验数据</h2>
+      <form id="uploadForm">
+        <input type="file" id="fileInput" accept=".xlsx, .xls" required><br>
+        <button type="button" onclick="uploadExcel()">上传Excel文件</button>
+      </form>
+      <div id="uploadResult" class="result"></div>
+    </div>
+    
+    <!-- 生成系统二维码 -->
+    <div class="section">
+      <h2>生成系统二维码</h2>
+      <p>扫描此二维码进入实验项目查询系统</p>
+      <button type="button" onclick="generateSystemQRCode()">生成系统二维码</button>
+      <div id="systemQRCodeContainer" style="margin-top: 20px; text-align: center;"></div>
+    </div>
+    
+    <!-- 导出数据 -->
+    <div class="section">
+      <h2>导出数据</h2>
+      <p>导出实验数据为JSON文件，用于更新data/experiments.json</p>
+      <button type="button" onclick="exportJSON()">导出JSON数据</button>
+    </div>
+    
+    <!-- 手动添加实验 -->
+    <div class="section">
+      <h2>添加实验项目</h2>
+      <form id="addForm">
+        <input type="text" id="addSampleName" placeholder="样品名称" required><br>
+        <input type="text" id="addMaterialStandard" placeholder="材料标准" required><br>
+        <input type="text" id="addTestItems" placeholder="能检测项目" required><br>
+        <input type="text" id="addBatch" placeholder="代表批量" required><br>
+        <input type="text" id="addSampleQuantity" placeholder="试样携带数量" required><br>
+        <textarea id="addRemark" placeholder="备注"></textarea><br>
+        <button type="button" onclick="addExperiment()">添加实验</button>
+      </form>
+      <div id="addResult" class="result"></div>
+    </div>
+    
+    <!-- 实验数据列表 -->
+    <div class="section">
+      <h2>实验数据管理</h2>
+      <div id="experimentList" class="experiment-list"></div>
+    </div>
+  </div>
+  <div id="qrcodeModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 20px; border-radius: 10px; text-align: center;">
+      <h3>实验项目二维码</h3>
+      <div id="qrcodeContainer"></div>
+      <p>使用微信扫描二维码查询实验项目</p>
+      <button onclick="closeQRCode()" style="margin-top: 20px; padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">关闭</button>
+    </div>
+  </div>
+  
+  <script>
+    // 从JSON文件读取数据
+    let experiments = [];
+    
+    // 加载实验数据
+    function loadExperiments() {
+      return fetch('data/experiments.json')
+        .then(response => response.json())
+        .then(data => {
+          experiments = data;
+          console.log('加载实验数据成功:', experiments.length, '条');
+          // 同时保存到localStorage，以便在管理后台修改
+          localStorage.setItem('experiments', JSON.stringify(experiments));
+          // 更新实验列表
+          updateExperimentList();
+          return experiments;
+        })
+        .catch(error => {
+          console.error('加载实验数据失败:', error);
+          // 如果加载失败，从localStorage读取或使用默认数据
+          const storedData = localStorage.getItem('experiments');
+          if (storedData) {
+            experiments = JSON.parse(storedData);
+            console.log('从localStorage加载数据:', experiments.length, '条');
+          } else {
+            // 使用默认数据
+            experiments = [
+              { 
+                '样品名称': '热轧带肋钢筋', 
+                '材料标准': 'GB 1499.2-2018', 
+                '能检测项目': '力学性能、化学成分', 
+                '代表批量': '60吨', 
+                '试样携带数量': '5根', 
+                '备注': '长度不小于500mm'
+              },
+              { 
+                '样品名称': '热轧光圆钢筋', 
+                '材料标准': 'GB 1499.1-2017', 
+                '能检测项目': '力学性能、化学成分', 
+                '代表批量': '60吨', 
+                '试样携带数量': '5根', 
+                '备注': '长度不小于500mm'
+              },
+              { 
+                '样品名称': '混凝土抗压强度', 
+                '材料标准': 'GB/T 50081-2019', 
+                '能检测项目': '抗压强度', 
+                '代表批量': '100m³', 
+                '试样携带数量': '3组', 
+                '备注': '标准养护'
+              }
+            ];
+            console.log('使用默认数据');
+          }
+          // 更新实验列表
+          updateExperimentList();
+          return experiments;
+        });
+    }
+    
+    // 更新实验列表
+    function updateExperimentList() {
+      const experimentList = document.getElementById('experimentList');
+      
+      if (experiments.length === 0) {
+        experimentList.innerHTML = '<p>暂无实验数据</p>';
+        return;
+      }
+      
+      experimentList.innerHTML = experiments.map((item, index) => `
+        <div class="experiment-item">
+          <h3>${item['样品名称'] || '未知样品'}</h3>
+          <p><strong>材料标准:</strong> ${item['材料标准'] || '无'}</p>
+          <p><strong>能检测项目:</strong> ${item['能检测项目'] || '无'}</p>
+          <p><strong>代表批量:</strong> ${item['代表批量'] || '无'}</p>
+          <p><strong>试样携带数量:</strong> ${item['试样携带数量'] || '无'}</p>
+          <p><strong>备注:</strong> ${item['备注'] || '无'}</p>
+          <div class="action-buttons">
+            <button onclick="editExperiment(${index})">编辑</button>
+            <button onclick="deleteExperiment(${index})">删除</button>
+            <button onclick="generateQRCode(${index})">生成二维码</button>
+          </div>
+          <div id="editForm-${index}" class="edit-form" style="display: none;">
+            <input type="text" id="sampleName-${index}" value="${item['样品名称'] || ''}" placeholder="样品名称">
+            <input type="text" id="materialStandard-${index}" value="${item['材料标准'] || ''}" placeholder="材料标准">
+            <input type="text" id="testItems-${index}" value="${item['能检测项目'] || ''}" placeholder="能检测项目">
+            <input type="text" id="batch-${index}" value="${item['代表批量'] || ''}" placeholder="代表批量">
+            <input type="text" id="sampleQuantity-${index}" value="${item['试样携带数量'] || ''}" placeholder="试样携带数量">
+            <textarea id="remark-${index}" placeholder="备注">${item['备注'] || ''}</textarea>
+            <button onclick="saveExperiment(${index})">保存</button>
+            <button onclick="cancelEdit(${index})">取消</button>
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    // 导出JSON数据
+    function exportJSON() {
+      const jsonStr = JSON.stringify(experiments, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'experiments.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      alert('导出成功，请将文件保存到data目录');
+    }
+    
+    // 上传Excel文件
+    function uploadExcel() {
+      const fileInput = document.getElementById('fileInput');
+      const file = fileInput.files[0];
+      
+      if (!file) {
+        alert('请选择Excel文件');
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const newExperiments = XLSX.utils.sheet_to_json(worksheet);
+          
+          // 更新全局变量
+          experiments = newExperiments;
+          // 同时保存到localStorage
+          localStorage.setItem('experiments', JSON.stringify(experiments));
+          // 显示成功消息
+          document.getElementById('uploadResult').textContent = `上传成功 (共${experiments.length}条数据)`;
+          // 更新实验列表
+          updateExperimentList();
+        } catch (error) {
+          console.error('Excel解析错误:', error);
+          document.getElementById('uploadResult').textContent = '上传失败: ' + error.message;
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+    
+    // 添加实验
+    function addExperiment() {
+      const sampleName = document.getElementById('addSampleName').value;
+      const materialStandard = document.getElementById('addMaterialStandard').value;
+      const testItems = document.getElementById('addTestItems').value;
+      const batch = document.getElementById('addBatch').value;
+      const sampleQuantity = document.getElementById('addSampleQuantity').value;
+      const remark = document.getElementById('addRemark').value;
+      
+      if (!sampleName || !materialStandard || !testItems || !batch || !sampleQuantity) {
+        alert('请填写所有必填字段');
+        return;
+      }
+      
+      experiments.push({ 
+        '样品名称': sampleName, 
+        '材料标准': materialStandard, 
+        '能检测项目': testItems, 
+        '代表批量': batch, 
+        '试样携带数量': sampleQuantity, 
+        '备注': remark 
+      });
+      localStorage.setItem('experiments', JSON.stringify(experiments));
+      
+      document.getElementById('addResult').textContent = '添加成功';
+      document.getElementById('addForm').reset();
+      updateExperimentList();
+    }
+    
+    // 编辑实验
+    function editExperiment(index) {
+      document.getElementById(`editForm-${index}`).style.display = 'block';
+    }
+    
+    // 取消编辑
+    function cancelEdit(index) {
+      document.getElementById(`editForm-${index}`).style.display = 'none';
+    }
+    
+    // 保存实验
+    function saveExperiment(index) {
+      const sampleName = document.getElementById(`sampleName-${index}`).value;
+      const materialStandard = document.getElementById(`materialStandard-${index}`).value;
+      const testItems = document.getElementById(`testItems-${index}`).value;
+      const batch = document.getElementById(`batch-${index}`).value;
+      const sampleQuantity = document.getElementById(`sampleQuantity-${index}`).value;
+      const remark = document.getElementById(`remark-${index}`).value;
+      
+      experiments[index] = { 
+        '样品名称': sampleName, 
+        '材料标准': materialStandard, 
+        '能检测项目': testItems, 
+        '代表批量': batch, 
+        '试样携带数量': sampleQuantity, 
+        '备注': remark 
+      };
+      localStorage.setItem('experiments', JSON.stringify(experiments));
+      
+      alert('保存成功');
+      updateExperimentList();
+    }
+    
+    // 删除实验
+    function deleteExperiment(index) {
+      if (confirm('确定要删除这个实验吗？')) {
+        experiments.splice(index, 1);
+        localStorage.setItem('experiments', JSON.stringify(experiments));
+        
+        alert('删除成功');
+        updateExperimentList();
+      }
+    }
+    
+    // 生成系统二维码
+    function generateSystemQRCode() {
+      // 获取当前页面的URL，确保是完整的绝对路径
+      let currentUrl = window.location.href;
+      // 替换admin.html为index.html
+      let indexUrl = currentUrl.replace('admin.html', 'index.html');
+      // 确保URL格式正确
+      const qrcodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(indexUrl)}`;
+      document.getElementById('systemQRCodeContainer').innerHTML = `<img src="${qrcodeUrl}" alt="系统二维码">`;
+      // 显示生成的URL，方便调试
+      document.getElementById('systemQRCodeContainer').innerHTML += `<p style="margin-top: 10px; font-size: 12px; word-break: break-all;">URL: ${indexUrl}</p>`;
+    }
+    
+    // 生成单个实验二维码
+    function generateQRCode(index) {
+      const url = `${window.location.origin}${window.location.pathname.replace('admin.html', 'index.html')}?sample=${index}`;
+      const qrcodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
+      document.getElementById('qrcodeContainer').innerHTML = `<img src="${qrcodeUrl}" alt="二维码">`;
+      document.getElementById('qrcodeModal').style.display = 'block';
+    }
+    
+    // 关闭二维码
+    function closeQRCode() {
+      document.getElementById('qrcodeModal').style.display = 'none';
+    }
+    
+    // 初始化
+    window.onload = loadExperiments;
+  </script>
+</body>
+</html>

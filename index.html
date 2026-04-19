@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>天津泰达工程技术咨询服务有限公司</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; min-height: 100vh; background-color: #f5f5f5; }
+    .header { background-color: #4CAF50; color: white; padding: 15px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .header h1 { margin: 0; font-size: 20px; font-weight: normal; }
+    .search-section { padding: 20px; text-align: center; background-color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .search-section h2 { color: #333; margin-bottom: 20px; font-size: 18px; font-weight: normal; }
+    .search-box { width: 100%; max-width: 500px; position: relative; display: inline-block; }
+    input[type="text"] { width: 100%; padding: 12px 50px 12px 20px; font-size: 16px; border: 2px solid #ddd; border-radius: 25px; outline: none; transition: all 0.3s ease; }
+    input[type="text"]:focus { border-color: #4CAF50; box-shadow: 0 0 10px rgba(76, 175, 80, 0.3); }
+    .voice-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 22px; cursor: pointer; color: #666; padding: 5px; }
+    .voice-btn:hover { color: #4CAF50; }
+    .search-hint { font-size: 12px; color: #999; margin-top: 10px; }
+    .results { padding: 20px; width: 100%; max-width: 600px; margin: 0 auto; box-sizing: border-box; flex: 1; }
+    .result-item { padding: 15px; border-bottom: 1px solid #eee; cursor: pointer; transition: background-color 0.2s ease; background-color: white; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .result-item:hover { background-color: #f9f9f9; }
+    .result-item h3 { margin: 0 0 8px 0; color: #333; font-size: 16px; }
+    .result-item p { margin: 4px 0; color: #666; font-size: 13px; }
+    .result-item p strong { color: #333; }
+    .footer { background-color: #333; color: white; padding: 15px; text-align: center; font-size: 12px; line-height: 1.8; }
+    .footer p { margin: 3px 0; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>天津泰达工程技术咨询服务有限公司</h1>
+  </div>
+  
+  <div class="search-section">
+    <h2>实验室实验项目查询</h2>
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="输入关键词搜索实验项目..." autocomplete="off">
+      <button class="voice-btn" id="voiceBtn" title="语音搜索">🎤</button>
+    </div>
+    <p class="search-hint">可以输入样品名称或材质单（出厂报告）标准进行查询</p>
+  </div>
+  
+  <div class="results" id="results"></div>
+  
+  <div class="footer">
+    <p>公司地址：天津开发区第六大街洪泽路21号</p>
+    <p>报告查询电话：66200388 &nbsp;&nbsp; 收样电话：66200398</p>
+  </div>
+  
+  <script>
+    // 从JSON文件读取数据
+    let experiments = [];
+
+    // 加载实验数据
+    function loadExperiments() {
+      return fetch('data/experiments.json')
+        .then(response => response.json())
+        .then(data => {
+          experiments = data;
+          console.log('加载实验数据成功:', experiments.length, '条');
+          return experiments;
+        })
+        .catch(error => {
+          console.error('加载实验数据失败:', error);
+          // 如果加载失败，使用默认数据
+          experiments = [
+            {
+              '样品名称': '热轧带肋钢筋',
+              '材料标准': 'GB 1499.2-2018',
+              '能检测项目': '力学性能、化学成分',
+              '代表批量': '60吨',
+              '试样携带数量': '5根',
+              '备注': '长度不小于500mm'
+            },
+            {
+              '样品名称': '热轧光圆钢筋',
+              '材料标准': 'GB 1499.1-2017',
+              '能检测项目': '力学性能、化学成分',
+              '代表批量': '60吨',
+              '试样携带数量': '5根',
+              '备注': '长度不小于500mm'
+            },
+            {
+              '样品名称': '混凝土抗压强度',
+              '材料标准': 'GB/T 50081-2019',
+              '能检测项目': '抗压强度',
+              '代表批量': '100m³',
+              '试样携带数量': '3组',
+              '备注': '标准养护'
+            }
+          ];
+          return experiments;
+        });
+    }
+
+    const searchInput = document.getElementById('searchInput');
+    const results = document.getElementById('results');
+    const voiceBtn = document.getElementById('voiceBtn');
+
+    // 搜索函数
+    function search(keyword) {
+      if (!keyword) {
+        results.innerHTML = '';
+        return;
+      }
+
+      // 显示加载中
+      results.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">搜索中...</p>';
+
+      // 尝试使用DeepSeek API进行智能查询
+      useDeepSeekQuery(keyword)
+        .then(deepseekResult => {
+          if (deepseekResult) {
+            // 如果DeepSeek API返回结果，显示智能查询结果
+            results.innerHTML = `<div class="result-item" style="background-color: #f0f8f0;">
+              <h3>智能查询结果</h3>
+              <p style="white-space: pre-wrap;">${deepseekResult}</p>
+            </div>`;
+          } else {
+            // 传统搜索
+            // 去除关键词中的标点符号和多余空格
+            const cleanKeyword = keyword.replace(/[\s\p{P}\p{S}]/gu, '').toLowerCase();
+
+            const filtered = experiments.filter(exp => {
+              // 去除搜索文本中的标点符号和多余空格
+              const searchText = ((exp['样品名称'] || '') + (exp['材料标准'] || '') + (exp['能检测项目'] || '') + (exp['代表批量'] || '') + (exp['试样携带数量'] || '') + (exp['备注'] || '')).replace(/[\s\p{P}\p{S}]/gu, '').toLowerCase();
+              return searchText.includes(cleanKeyword);
+            });
+
+            if (filtered.length === 0) {
+              results.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">未找到相关实验项目</p>';
+              return;
+            }
+
+            results.innerHTML = filtered.map(item => `
+              <div class="result-item">
+                <h3>${item['样品名称'] || '未知样品'}</h3>
+                <p><strong>材料标准:</strong> ${item['材料标准'] || '无'}</p>
+                <p><strong>能检测项目:</strong> ${item['能检测项目'] || '无'}</p>
+                <p><strong>代表批量:</strong> ${item['代表批量'] || '无'}</p>
+                <p><strong>试样携带数量:</strong> ${item['试样携带数量'] || '无'}</p>
+                <p><strong>备注:</strong> ${item['备注'] || '无'}</p>
+              </div>
+            `).join('');
+          }
+        })
+        .catch(error => {
+          console.error('搜索失败:', error);
+          // 回退到传统搜索
+          // 去除关键词中的标点符号和多余空格
+          const cleanKeyword = keyword.replace(/[\s\p{P}\p{S}]/gu, '').toLowerCase();
+
+          const filtered = experiments.filter(exp => {
+            // 去除搜索文本中的标点符号和多余空格
+            const searchText = ((exp['样品名称'] || '') + (exp['材料标准'] || '') + (exp['能检测项目'] || '') + (exp['代表批量'] || '') + (exp['试样携带数量'] || '') + (exp['备注'] || '')).replace(/[\s\p{P}\p{S}]/gu, '').toLowerCase();
+            return searchText.includes(cleanKeyword);
+          });
+
+          if (filtered.length === 0) {
+            results.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">未找到相关实验项目</p>';
+            return;
+          }
+
+          results.innerHTML = filtered.map(item => `
+            <div class="result-item">
+              <h3>${item['样品名称'] || '未知样品'}</h3>
+              <p><strong>材料标准:</strong> ${item['材料标准'] || '无'}</p>
+              <p><strong>能检测项目:</strong> ${item['能检测项目'] || '无'}</p>
+              <p><strong>代表批量:</strong> ${item['代表批量'] || '无'}</p>
+              <p><strong>试样携带数量:</strong> ${item['试样携带数量'] || '无'}</p>
+              <p><strong>备注:</strong> ${item['备注'] || '无'}</p>
+            </div>
+          `).join('');
+        });
+    }
+
+    // 输入框搜索
+    searchInput.addEventListener('input', function() {
+      search(this.value);
+    });
+
+    // 百度语音识别API密钥（需要替换为真实的API密钥）
+    const BAIDU_API_KEY = 'your_api_key';
+    const BAIDU_SECRET_KEY = 'your_secret_key';
+    let accessToken = '';
+    
+    // DeepSeek API配置（免费）
+    const DEEPSEEK_API_KEY = 'sk-901e501f8e9f43ca861f17029a3f7780'; // 已配置API密钥
+
+    // 获取百度语音识别API的访问令牌
+    function getBaiduAccessToken() {
+      return new Promise((resolve, reject) => {
+        if (accessToken) {
+          resolve(accessToken);
+          return;
+        }
+
+        const url = `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${BAIDU_API_KEY}&client_secret=${BAIDU_SECRET_KEY}`;
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.access_token) {
+            accessToken = data.access_token;
+            resolve(access_token);
+          } else {
+            reject('获取访问令牌失败');
+          }
+        })
+        .catch(error => {
+          reject('获取访问令牌出错:', error);
+        });
+      });
+    }
+
+    // 使用百度语音识别API
+    function useBaiduSpeechRecognition() {
+      // 检查是否支持 getUserMedia
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error('浏览器不支持麦克风访问');
+        return Promise.reject('浏览器不支持麦克风访问');
+      }
+
+      return new Promise((resolve, reject) => {
+        // 请求麦克风权限
+        navigator.mediaDevices.getUserMedia({ audio: true })
+          .then(stream => {
+            const mediaRecorder = new MediaRecorder(stream);
+            const chunks = [];
+
+            mediaRecorder.ondataavailable = function(e) {
+              chunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = function() {
+              const blob = new Blob(chunks, { type: 'audio/wav' });
+              stream.getTracks().forEach(track => track.stop());
+
+              // 获取访问令牌
+              getBaiduAccessToken()
+                .then(token => {
+                  // 调用百度语音识别API
+                  const url = `https://vop.baidu.com/server_api`;
+                  const formData = new FormData();
+                  formData.append('format', 'wav');
+                  formData.append('rate', '16000');
+                  formData.append('channel', '1');
+                  formData.append('cuid', 'lab_query_system');
+                  formData.append('token', token);
+                  formData.append('speech', blob, 'recording.wav');
+
+                  fetch(url, {
+                    method: 'POST',
+                    body: formData
+                  })
+                  .then(response => response.json())
+                  .then(data => {
+                    if (data.result && data.result.length > 0) {
+                      resolve(data.result[0]);
+                    } else {
+                      reject('语音识别失败: ' + (data.err_msg || '未知错误'));
+                    }
+                  })
+                  .catch(error => {
+                    reject('语音识别请求失败:', error);
+                  });
+                })
+                .catch(error => {
+                  reject('获取访问令牌失败:', error);
+                });
+            };
+
+            mediaRecorder.start();
+
+            // 录制3秒后停止
+            setTimeout(() => {
+              mediaRecorder.stop();
+            }, 3000);
+          })
+          .catch(error => {
+            reject('获取麦克风权限失败:', error);
+          });
+      });
+    }
+
+    // 使用DeepSeek API进行智能查询
+    function useDeepSeekQuery(query) {
+      return new Promise((resolve, reject) => {
+        if (!DEEPSEEK_API_KEY || DEEPSEEK_API_KEY === 'your_deepseek_api_key') {
+          // 如果没有配置API密钥，使用传统搜索
+          resolve(null);
+          return;
+        }
+
+        const url = 'https://api.deepseek.com/v1/chat/completions';
+        const messages = [
+          {
+            role: 'system',
+            content: '你是一个实验室实验项目查询助手，根据用户的问题，从实验项目库中找出最相关的项目。实验项目库包含样品名称、材料标准、能检测项目、代表批量、试样携带数量和备注等信息。请分析用户的问题，提取关键词，并返回最相关的实验项目。'
+          },
+          {
+            role: 'user',
+            content: `用户查询: ${query}\n\n实验项目库: ${JSON.stringify(experiments)}`
+          }
+        ];
+
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: 'deepseek-chat',
+            messages: messages,
+            temperature: 0.7,
+            max_tokens: 500
+          })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.choices && data.choices.length > 0) {
+            resolve(data.choices[0].message.content);
+          } else {
+            resolve(null);
+          }
+        })
+        .catch(error => {
+          console.error('DeepSeek API调用失败:', error);
+          resolve(null);
+        });
+      });
+    }
+
+    // 检测是否为微信浏览器
+    function isWeChatBrowser() {
+      return /MicroMessenger/i.test(navigator.userAgent);
+    }
+
+    // 语音搜索
+    voiceBtn.addEventListener('click', function() {
+      voiceBtn.style.color = '#4CAF50';
+      voiceBtn.innerHTML = '🔊';
+
+      // 检测是否为微信浏览器
+      if (isWeChatBrowser()) {
+        // 微信浏览器提示
+        setTimeout(() => {
+          voiceBtn.style.color = '#666';
+          voiceBtn.innerHTML = '🎤';
+          alert('微信浏览器可能限制语音功能，请直接输入文字搜索');
+        }, 500);
+      } else {
+        // 非微信浏览器使用百度语音识别
+        useBaiduSpeechRecognition()
+          .then(text => {
+            console.log('百度语音识别结果:', text);
+            searchInput.value = text;
+            search(text);
+          })
+          .catch(error => {
+            console.error('百度语音识别失败:', error);
+            // 回退到浏览器内置语音识别
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+              try {
+                const recognition = new SpeechRecognition();
+                recognition.lang = 'zh-CN';
+                recognition.continuous = false;
+                recognition.interimResults = false;
+
+                recognition.onresult = function(event) {
+                  if (event.results && event.results.length > 0 && event.results[0].length > 0) {
+                    const transcript = event.results[0][0].transcript;
+                    console.log('浏览器语音识别结果:', transcript);
+                    searchInput.value = transcript;
+                    search(transcript);
+                  } else {
+                    alert('语音识别失败，未获取到结果');
+                  }
+                };
+
+                recognition.onend = function() {
+                  voiceBtn.style.color = '#666';
+                  voiceBtn.innerHTML = '🎤';
+                };
+
+                recognition.onerror = function(event) {
+                  voiceBtn.style.color = '#666';
+                  voiceBtn.innerHTML = '🎤';
+                  console.error('浏览器语音识别错误:', event.error);
+                  alert('语音识别失败，请直接输入文字搜索');
+                };
+
+                recognition.start();
+              } catch (error) {
+                voiceBtn.style.color = '#666';
+                voiceBtn.innerHTML = '🎤';
+                console.error('启动浏览器语音识别失败:', error);
+                alert('语音识别失败，请直接输入文字搜索');
+              }
+            } else {
+              voiceBtn.style.color = '#666';
+              voiceBtn.innerHTML = '🎤';
+              alert('您的浏览器不支持语音识别功能，请直接输入文字搜索');
+            }
+          })
+          .finally(() => {
+            // 确保按钮状态恢复
+            setTimeout(() => {
+              if (voiceBtn.innerHTML === '🔊') {
+                voiceBtn.style.color = '#666';
+                voiceBtn.innerHTML = '🎤';
+              }
+            }, 3500);
+          });
+      }
+    });
+
+    // 处理URL参数
+    function handleQuery() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const sampleId = urlParams.get('sample');
+
+      // 无论是否有sample参数，都显示搜索页面
+      // 这样用户扫码后可以直接进行搜索
+    }
+
+    // 初始化
+    window.onload = function() {
+      // 加载实验数据
+      loadExperiments().then(() => {
+        handleQuery();
+      });
+    };
+  </script>
+</body>
+</html>
